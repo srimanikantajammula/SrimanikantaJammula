@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Employee Dashboard - Queue Management System</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/main.css' %}">
+    <style>
+        /* Mobile optimizations for employee panel */
+        @media (max-width: 768px) {
+            .table th:nth-child(4),
+            .table td:nth-child(4) {
+                display: none; /* Hide email column on mobile */
+            }
+            
+            .btn {
+                touch-action: manipulation;
+                -webkit-tap-highlight-color: transparent;
+                min-height: 44px; /* iOS touch target size */
+            }
+            
+            .btn-row {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .btn-row .btn {
+                width: 100%;
+                max-width: 300px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .table th:nth-child(3),
+            .table td:nth-child(3) {
+                display: none; /* Hide name column on very small screens */
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        {% if user.is_authenticated %}
+            <div class="card card-large">
+                <div class="header">
+                    <div class="logo">👨‍💼</div>
+                    <h1 class="title">Employee Dashboard</h1>
+                    <p class="subtitle">Welcome, {{ user.username }}</p>
+                </div>
+
+                <div class="text-center mb-4">
+                    <div class="stat-card">
+                        <div class="stat-icon">🔢</div>
+                        <div class="stat-number">{{ counter }}</div>
+                        <div class="stat-label">Counter Number</div>
+                    </div>
+                </div>
+
+                {% if name %}
+                    <div class="table-container">
+                        <h3 class="mb-3">Currently Serving</h3>
+                        <div class="queue-item">
+                            <div class="queue-info">
+                                <div class="queue-number">Customer: {{ name }}</div>
+                                <div class="queue-status">Token: #{{ token }}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <form method="POST" action="{% url 'employee' %}">
+                        {% csrf_token %}
+                        <div class="btn-row">
+                            <button class="btn btn-success" name="serve" type="submit">Serve</button>
+                            <button class="btn btn-danger" name="remove" type="submit">Remove</button>
+                            <button class="btn btn-primary" name="next" type="submit">Skip / Next</button>
+                            <button class="btn btn-secondary" name="notify_next" type="submit" title="Send reminder to the next person without changing the queue">Notify Next</button>
+                        </div>
+                    </form>
+                    <form method="POST" action="{% url 'employee' %}" class="mt-2">
+                        {% csrf_token %}
+                        <div class="btn-row">
+                            <button class="btn btn-secondary" name="add_delay_5" type="submit">+5 min delay</button>
+                            <button class="btn btn-secondary" name="add_delay_10" type="submit">+10 min delay</button>
+                            <button class="btn btn-secondary" name="add_delay_15" type="submit">+15 min delay</button>
+                            <button class="btn btn-secondary" name="reset_delay" type="submit">Reset delay</button>
+                        </div>
+                    </form>
+                {% else %}
+                    <div class="text-center">
+                        <div class="logo">📭</div>
+                        <h3 class="mb-2">No customers in the queue</h3>
+                        <p class="subtitle">Wait for customers to join the queue</p>
+                    </div>
+                {% endif %}
+
+                <!-- Queue Overview -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">👥</div>
+                        <div class="stat-number">{{ queue_count }}</div>
+                        <div class="stat-label">Total in Queue</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">⏳</div>
+                        <div class="stat-number">
+                            {% if queue_count > 0 %}
+                                {{ queue_count|add:"-1" }}
+                            {% else %}
+                                0
+                            {% endif %}
+                        </div>
+                        <div class="stat-label">Currently Waiting</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">🎯</div>
+                        <div class="stat-number">{% if name %}1{% else %}0{% endif %}</div>
+                        <div class="stat-label">Currently Serving</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">📧</div>
+                        <div class="stat-number">{{ unverified_count }}</div>
+                        <div class="stat-label">Pending Verification</div>
+                    </div>
+                </div>
+
+                <!-- All Users in Queue -->
+                {% if all_queue_users %}
+                    <div class="table-container">
+                        <h3 class="mb-3">All Users in Queue</h3>
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Position</th>
+                                    <th>Token</th>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Status</th>
+                                    <th>Availability</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for user in all_queue_users %}
+                                <tr {% if forloop.first %}style="background-color: #e8f5e8;"{% endif %}>
+                                    <td>
+                                        <strong>{% if forloop.first %}🎯 Serving{% else %}{{ forloop.counter }}{% endif %}</strong>
+                                    </td>
+                                    <td><strong>#{{ user.token }}</strong></td>
+                                    <td>{{ user.name }}</td>
+                                    <td>{{ user.email }}</td>
+                                    <td>
+                                        {% if forloop.first %}
+                                            <span style="color: #28a745; font-weight: bold;">● Currently Serving</span>
+                                        {% else %}
+                                            <span style="color: #6c757d;">● Waiting</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if user.is_available %}
+                                            <span style="color: #28a745; font-weight: bold;">🟢 Available</span>
+                                        {% else %}
+                                            <span style="color: #dc3545; font-weight: bold;">🔴 Unavailable</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center">
+                        <div class="logo">📋</div>
+                        <h3 class="mb-2">Queue is Empty</h3>
+                        <p class="subtitle">No users are currently waiting in the queue</p>
+                    </div>
+                {% endif %}
+
+                <!-- Unverified Users -->
+                {% if unverified_users %}
+                    <div class="table-container">
+                        <h3 class="mb-3">Pending Email Verification</h3>
+                        <p class="text-muted mb-3">These users have registered but haven't verified their email with OTP yet.</p>
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for user in unverified_users %}
+                                <tr>
+                                    <td>#{{ user.id }}</td>
+                                    <td>{{ user.name }}</td>
+                                    <td>{{ user.email }}</td>
+                                    <td>
+                                        <span style="color: #ffc107; font-weight: bold;">● Pending OTP Verification</span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% endif %}
+
+                <div class="text-center mt-4">
+                    <a href="{% url 'selectCounter' %}" class="btn btn-secondary">Select Counter</a>
+                    <a href="{% url 'logout' %}" class="btn btn-danger">Logout</a>
+                </div>
+            </div>
+        {% else %}
+            <div class="page-container">
+                <div class="card">
+                    <div class="header">
+                        <div class="logo">🔐</div>
+                        <h1 class="title">Access Denied</h1>
+                        <p class="subtitle">Please login to access employee features</p>
+                    </div>
+                    <div class="btn-container">
+                        <a href="{% url 'login' %}" class="btn btn-primary btn-full">Login</a>
+                        <a href="{% url 'index' %}" class="btn btn-secondary btn-full">Back to Home</a>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
+        {% if messages %}
+            <div class="messages">
+                {% for message in messages %}
+                    <div class="alert alert-error">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    </div>
+
+    <script>
+        // Prevent form resubmission on page reload
+        if (window.history.replaceState) {
+            window.history.replaceState(null, null, window.location.href);
+        }
+        
+        // Mobile optimizations
+        document.addEventListener('DOMContentLoaded', function() {
+            var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
+            
+            if (isMobile) {
+                // Prevent zoom on double tap
+                var lastTouchEnd = 0;
+                document.addEventListener('touchend', function (event) {
+                    var now = (new Date()).getTime();
+                    if (now - lastTouchEnd <= 300) {
+                        event.preventDefault();
+                    }
+                    lastTouchEnd = now;
+                }, false);
+                
+                // Optimize for mobile performance
+                document.body.style.webkitTouchCallout = 'none';
+                document.body.style.webkitUserSelect = 'none';
+                document.body.style.khtmlUserSelect = 'none';
+                document.body.style.mozUserSelect = 'none';
+                document.body.style.msUserSelect = 'none';
+                document.body.style.userSelect = 'none';
+            }
+        });
+        
+        // Auto-refresh page every 60 seconds to show updated queue status
+        setTimeout(function() {
+            window.location.reload();
+        }, 60000);
+        
+        // Handle orientation change on mobile
+        window.addEventListener('orientationchange', function() {
+            setTimeout(function() {
+                window.dispatchEvent(new Event('resize'));
+            }, 100);
+        });
+    </script>
+</body>
+</html>

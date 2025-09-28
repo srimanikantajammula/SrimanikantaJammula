@@ -1,0 +1,34 @@
+{% extends 'app1/base.html' %}
+{% block title %}Queue Management System - Home{% endblock %}
+
+{% block content %}
+<div class="page-container">
+        <div class="card">
+            <div class="header">
+                <div class="logo">🎯</div>
+                <h1 class="title">Queue Management System</h1>
+                <p class="subtitle">Efficient queue management for better customer experience</p>
+            </div>
+            
+            <div class="btn-container">
+                <a href="{% url 'register' %}" class="btn btn-primary btn-full">Join Queue (New User)</a>
+                <a href="{% url 'register' %}" class="btn btn-secondary btn-full">Access Queue (Existing User)</a>
+            </div>
+            
+            <div class="features">
+                <div class="feature">
+                    <span class="feature-icon">⏱️</span>
+                    <span>Real-time queue updates</span>
+                </div>
+                <div class="feature">
+                    <span class="feature-icon">📱</span>
+                    <span>Mobile-friendly interface</span>
+                </div>
+                <div class="feature">
+                    <span class="feature-icon">🔔</span>
+                    <span>Instant notifications</span>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

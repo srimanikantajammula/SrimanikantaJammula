@@ -1,0 +1,42 @@
+{% extends 'app1/base.html' %}
+{% block title %}Send Request to Admin{% endblock %}
+
+{% block extra_css %}
+<style>
+    .container { max-width: 760px; margin: 32px auto; }
+    .card { padding: 24px; background: #fff; border-radius: 12px; box-shadow: 0 6px 18px rgba(0,0,0,0.06); }
+    .mb-2 { margin-bottom: 12px; }
+    .mb-3 { margin-bottom: 16px; }
+    .btn-row { display: flex; gap: 12px; margin-top: 12px; }
+    textarea { width: 100%; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="card">
+      <h2>User Request to Admin</h2>
+      <p class="mb-3">Send a message to the admin (e.g., running late, request forward in queue, general help).</p>
+      <form method="post">
+        {% csrf_token %}
+        <div class="mb-2">
+          <label for="request_type">Request Type</label>
+          <select id="request_type" name="request_type" class="form-control">
+            {% for value, label in request_types %}
+              <option value="{{ value }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-2">
+          <label for="message">Message</label>
+          <textarea id="message" name="message" rows="6" class="form-control" placeholder="Type your message here..."></textarea>
+        </div>
+        <div class="btn-row">
+          <button type="submit" class="btn btn-primary">Submit Request</button>
+          <a href="{% url 'queue_details' %}" class="btn btn-secondary">Back to Queue</a>
+        </div>
+      </form>
+    </div>
+  </div>
+{% endblock %}
+

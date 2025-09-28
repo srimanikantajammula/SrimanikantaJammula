@@ -1,363 +1,567 @@
+from django.core.mail import send_mail
+from django.conf import settings
 from django.shortcuts import render, redirect
-from django.http import HttpResponse
 from django.contrib import messages
-from .models import userData, num_counters, Employee
+from .models import QueueUser, UserRequest, Employee, QueueConfig
+from .notifications import send_welcome_notification, send_call_now_notification
+from .email_utils import send_robust_email
+from .otp_utils import send_otp_email
 import random
-from django.contrib.auth.models import User, auth, Group
+import threading
+import logging
+from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
+from django.db import IntegrityError
+from django.db import models
+import os
 
-#----------------------------------------------------------FILL THE DETAILS BELOW--------------------------------------------------------------------
+logger = logging.getLogger(__name__)
 
-#email: input your email id and password as a string below
-import smtplib
-sender_email = ""
-password = ""
+def reset_all_positions():
+    """Reset all user positions to None to ensure clean position assignment"""
+    QueueUser.objects.all().update(position=None)
 
-#phone: input your twilio account's SID, token and phone number as a string below
-from twilio.rest import Client
-account_sid = ''
-auth_token = ''
-twilio_phone = ''   #start with '+'
+def send_email_in_background(subject, message, recipient_list):
+    """Wrapper to send email in a thread and log exceptions."""
+    def email_sender():
+        try:
+            success = send_robust_email(subject, message, recipient_list)
+            if not success:
+                logger.error(f"Background email sending failed to {recipient_list}. Please check SMTP logs.")
+        except Exception as e:
+            logger.error(f"Exception in background email thread for {recipient_list}: {e}", exc_info=True)
 
-#--------------------------------------------------------------END OF DETAILS------------------------------------------------------------------------
+    email_thread = threading.Thread(target=email_sender)
+    email_thread.start()
 
-#uid is the token number, starts with 0, increments with 1 and so on...
-uid = 0
-
-#getting the admin info
-u = User.objects.get(username='admin')
-
-#the employee model under application App1 has the data of admin, the counterNumber for admin means the total number of
-#counters the admin want the employees to access. For others, it is zero by default and can be selected from selectCounter
-#website by employee numbered between 1 and total_counters (admin's counter number)
-#The admin can change the the total number of counters anytime but the system would have to restart for the changes to be applied
-total_counters = u.employee.counterNumber
-
-#counters is a dictionary which represents the counters and the number of people (queue size) of each available counter
-#For eg, counters = {1:5, 2:4, 4:6} means 1st counter has 5 people, 2nd counter has 4 people and 4th counter has 6 people
-#Empty by default, an employee would have to select a counter first for it to work
-counters = {}
-
-#naming convention w.r.t. employee (the counters available for the employees to choose)
-#For eg, if the total_counters is 4, then the employees can choose counter from 1, 2, 3, 4
-#No employee can select more than 1 counter
-availableCounters = list(range(1, total_counters + 1))
-
-#index (main) page
+# -------------------
+# Main Pages
+# -------------------
 def index(request):
-    return render(request, 'index.html')
+    return render(request, 'app1/index.html')
 
-#customer registration page
-def register(request):
-    #if counters dictionary is empty i.e. none of the counters is assigned to any employee. Hence, customers can't register.
-    if not counters:
-        return HttpResponse('There is no counter available. Kindly, try again when an employee arrives at the counter')
-    elif request.method == "POST":
-        name = request.POST['name']
-        email = request.POST['email']
-        phoneNumber = request.POST['phoneNumber']
 
-        #taking the proper information and displaying error for wrong ones
-
-        #checking if input email is valid
-        from django.core.validators import validate_email
-        try:
-            validate_email(email)
-        except:
-            messages.info(request, 'Enter a valid email address')
-            return redirect('register')
-
-        #checking if name column is empty
-        if name == '':
-            messages.info(request, 'Enter a name')
-            return redirect('register')
-        
-        #checking if phone number if numeric and has a length of 10 digits
-        elif not phoneNumber.isnumeric() or len(phoneNumber) != 10:
-            messages.info(request, 'Enter a valid 10 digit phone number')
-            return redirect('register')
-        
-        #else generating otp and sending it to customer via email and text message on phone number
-        else:
-            phoneNumber = '+91'+phoneNumber             #using +91 by default, so it will only work for indian number
-            #random 6 digit number generation for otp
-            otpNum = ''
-            for i in range(6):
-                otpNum += str(random.randint(0, 9))
-            try:
-                data = userData(name = name, email = email, phoneNumber = phoneNumber, otp = otpNum)
-                data.save()
-
-                # #E-MAIL
-                # rec_email = email
-                # message = "Dear {}, OTP to book your position in queue is {}. Do not share it with anyone.".format(name, otpNum)
-                # server = smtplib.SMTP('smtp.gmail.com', 587)
-                # server.starttls()
-                # server.login(sender_email, password)
-                # server.sendmail(sender_email, rec_email, message)
-
-                # #PHONE
-                # client = Client(account_sid, auth_token)
-                # msg = client.messages.create(
-                #     body = f"Dear {name}, OTP to book your position in queue is {otpNum}. Do not share it with anyone.",
-                #     from_ = twilio_phone,
-                #     to = phoneNumber
-                # )
-
-                return redirect('otp', phoneNumber)
-            except:
-                #same phone number can't be registered again, its unique
-                messages.info(request, 'This Phone Number is already registered')
-                return redirect('register')
-
-    else:
-        return render(request, 'register.html')
-
-#otp verification page
-def otp(request, phoneNumber):
-    d = userData.objects.get(phoneNumber = phoneNumber)
-    if request.method == 'POST':
-        input_otp = request.POST['input_otp']
-        if input_otp == d.otp:
-            #Assigning counter with smallest queue
-            global counters
-            global uid
-
-            #incrementing token number
-            uid += 1
-            #smallest queue
-            temp = min(counters.values())      
-            #counter(s) of that queue (more than one queue have same number of people)                         
-            res = [key for key in counters if counters[key] == temp]  
-            #assigning one of the counters with smallest queue  
-            d.counter = res[0]   
-            #position of customer                                       
-            d.pos = temp + 1
-            #token number of customer
-            d.token = uid
-            #saving data
-            d.save()
-            #adding one customer to the counters dictionary
-            counters[res[0]] += 1                                       
-
-            # #PHONE
-            # client = Client(account_sid, auth_token)
-            # msg = client.messages.create(
-            #     body = f"Dear {d.name}, your Token number is {uid}.",
-            #     from_ = twilio_phone,
-            #     to = phoneNumber
-            # )
-
-            # #E-MAIL
-            # rec_email = d.email
-            # message = "Dear {}, your Token number is {}.".format(d.name, uid)
-            # server = smtplib.SMTP('smtp.gmail.com', 587)
-            # server.starttls()
-            # server.login(sender_email, password)
-            # server.sendmail(sender_email, rec_email, message)
-
-            return redirect('queue details')
-        else:
-            messages.info(request, 'Invalid OTP')
-            return redirect('otp', phoneNumber)
-    else:
-        return render(request, 'otp.html', {'phoneNumber' : phoneNumber})
-
-#customer can check their counter number and position in queue using token number here
-#Since the queue is dynamic, the counter number might change.
 def view_queue(request):
-    if not counters:
-        return HttpResponse('There is no counter available. Kindly, try again when an employee arrives at the counter')
-    elif request.GET.get('token'):
-        token = request.GET['token']
-        try:
-            d = userData.objects.get(token = token)
-            return render(request, 'view_queue.html', {'counter_num': d.counter, 'pos': d.pos})
-        except:
-            messages.info(request, 'Token number not found')
-            return redirect('queue details')
-        
-    else:
-        return render(request, 'view_queue.html', {'counter_num': "", 'pos': ""})
-
-#employee login
-def login(request):
-    if request.method == "POST":
-        username = request.POST['username']
-        password = request.POST['password']
-
-        user = auth.authenticate(username = username, password = password) 
-        if user is not None:
-            auth.login(request, user)
-            return redirect('selectCounter')
-        else:
-            messages.info(request, 'Invalid credentials')
-            return redirect('login')
-    else:
-        return render(request, 'login.html')
-
-#employee logout
-def logout(request):
-    global counters
-    user = request.user
-    old_counter = user.employee.counterNumber
-    if old_counter in counters:
-        counters.pop(old_counter)
-        availableCounters.append(old_counter)
-
-    #if the queue is empty before logging out, it would cause an error because of the following query. That's why I used try-except here.
-    try:
-        current = userData.objects.get(counter = old_counter, pos = 0)
-        current.delete()
-    except:
-        pass
-
-    user.employee.counterNumber = 0
-    user.employee.save()
-
-    #In case the employee had customers at the counter before log out.
-   
-    #If every employee logs out, all the user(customer) data will be deleted.
-    if counters == {}:
-        userData.objects.all().delete()
+    # Check if user is verified
+    user_id = request.session.get('user_id')
+    if not user_id:
+        messages.error(request, "Please register and verify your email to view the queue.")
+        return redirect('register')
     
-    #Reassigning new counter (smallest queue) to customers who were assigned the old_counter (the counter which employee had before logging out).
-    else:
-        new = userData.objects.filter(counter = old_counter)
-        for customer in new:
-            temp = min(counters.values())                               #smallest queue
-            res = [key for key in counters if counters[key] == temp]    #counter(s) of that queue
-            customer.counter = res[0]
-            customer.pos = temp + 1
-            customer.save()
-            counters[res[0]] += 1
+    try:
+        user = QueueUser.objects.get(id=user_id)
+        if not user.is_verified:
+            messages.error(request, "Please verify your email with OTP to view the queue.")
+            return redirect('otp')
+    except QueueUser.DoesNotExist:
+        messages.error(request, "Invalid session. Please register again.")
+        return redirect('register')
+    
+    # Get all verified queue users ordered by position, but prioritize available users
+    queue_users = QueueUser.objects.filter(is_verified=True).order_by('is_available', 'position')
+    
+    # Get availability status for users ahead in queue
+    user_position = user.position if user.position else 0
+    users_ahead = QueueUser.objects.filter(
+        is_verified=True, 
+        position__lt=user_position
+    ).order_by('position')
+    
+    # Calculate statistics
+    total_users = queue_users.count()
+    current_position = 1 if total_users > 0 else 0
+    waiting_count = max(0, total_users - 1)
+    
+    # Calculate estimated waiting time for each user (15 minutes per person ahead) + global delay
+    config = QueueConfig.get()
+    global_delay = max(0, int(config.delay_offset_minutes))
+    queue_users_with_waiting_time = []
+    for user in queue_users:
+        # Calculate waiting time: (position - 1) * 15 minutes
+        # Position 1 = currently being served (0 wait time)
+        # Position 2 = 15 minutes wait, Position 3 = 30 minutes wait, etc.
+        # Only add global delay to waiting users (position > 1)
+        if user.position == 1:
+            estimated_wait_minutes = 0  # Currently serving
+        else:
+            estimated_wait_minutes = max(0, (user.position - 1) * 15 + global_delay)
+        
+        # Convert to hours and minutes for better display
+        hours = estimated_wait_minutes // 60
+        minutes = estimated_wait_minutes % 60
+        
+        if hours > 0:
+            wait_time_display = f"{hours}h {minutes}m" if minutes > 0 else f"{hours}h"
+        else:
+            wait_time_display = f"{minutes}m" if minutes > 0 else "Now serving"
+        
+        queue_users_with_waiting_time.append({
+            'user': user,
+            'estimated_wait_minutes': estimated_wait_minutes,
+            'wait_time_display': wait_time_display
+        })
+    
+    context = {
+        'queue_users': queue_users,
+        'queue_users_with_waiting_time': queue_users_with_waiting_time,
+        'total_users': total_users,
+        'current_position': current_position,
+        'waiting_count': waiting_count,
+        'users_ahead': users_ahead,
+        'current_user': user,
+    }
+    
+    return render(request, 'app1/view_queue.html', context)
 
-    auth.logout(request)
-    return redirect('login')
 
-#Employee controls page
-def employee(request):  #admin cannot access this website
-    if request.user.is_authenticated and request.user.username != 'admin':
-        global counters
-        n = request.user.employee.counterNumber
-        if n <= 0:
-            return redirect('selectCounter')
-        elif 'next' in request.POST:
-
-            #Dynamic queue: whenever the 'next customer' button is clicked by an employee, the queues are rearranged accordingly
-            #Consider there are 2 counters, one counter attended people faster than the other. Hence, 1st counter has 2 people and 2nd counter has 6 people in it.
-            #So, we can transfer 2 people from 2nd counter to 1st counter to balance it out. But the question is which 2 out of those 6 people.
-            #If we take the last 2, it would be easier to implement but unfair to the ones who came before them. So, the algorithm will work in the following way:
-            #The 4th and 5th person of 2nd queue will be assigned 3rd and 4th position of 1st counter and the 6th person of counter 2 will naturally get the 4th position of counter 2.
-            while max(counters.values()) > min(counters.values()) + 1:
-                smallest_queue = min(counters.values())                                 #smallest queue
-                largest_queue = max(counters.values())                                  #largest queue
-                small = [key for key in counters if counters[key] == smallest_queue]    #counter(s) of smallest queue
-                large = [key for key in counters if counters[key] == largest_queue]     #counter(s) of largest queue
-                small_counter = small[0]                                                #counter of smallest queue
-                large_counter = large[0]                                                #counter of largest queue
-                customer = userData.objects.get(counter = large_counter, pos = smallest_queue + 2)
-                customer.counter = small_counter
-                customer.pos = smallest_queue + 1
-                customer.save()
-                counters[large_counter] -= 1
-                counters[small_counter] += 1
-
-                #if the person removed from large_counter was at last position
-                try:    
-                    data = userData.objects.filter(counter = large_counter, pos__gt = smallest_queue + 2)   #__gt means greater than
-                    for i in data:
-                        i.pos -= 1
-                        i.save()
-                except:
-                    pass
-            
-            #next customer button is clicked, so decreasing the number of people in that queue by 1
-            if counters[n] > 0:
-                counters[n] -= 1
-
-            #Decrement the positions of customers by 1, and delete their data if the position is -1.
-            data = userData.objects.filter(counter = n)
-            for i in data:
-                i.pos -= 1
-                i.save()
-                if i.pos < 0:
-                    i.delete()
-
-        #calling the customer to counter when its their turn
-        try:
-            d = userData.objects.get(pos = 0, counter = n)
-
-            # #PHONE
-            # client = Client(account_sid, auth_token)
-            # msg = client.messages.create(
-            #     body = f"Dear {d.name}, it's your turn now. Kindly, arrive at counter number {d.counter}.",
-            #     from_ = twilio_phone,
-            #     to = str(d.phoneNumber)
-            # )
-           
-            # #E-MAIL
-            # rec_email = d.email
-            # message = "Dear {}, it's your turn now. Kindly, arrive at counter number {}.".format(d.name, d.counter)
-            # server = smtplib.SMTP('smtp.gmail.com', 587)
-            # server.starttls()
-            # server.login(sender_email, password)
-            # server.sendmail(sender_email, rec_email, message)
-
-            return render(request, 'employee.html', {'name': d.name, 'token': d.token, 'counter': n})
-        except:
-            messages.info(request, 'The queue is empty. Press "next customer" button when a customer arrives.')
-            return render(request, 'employee.html', {'name': '', 'token': '', 'counter': n})
-    else:
+def employee(request):
+    # Require authentication for employee dashboard
+    if not request.user.is_authenticated:
         return redirect('login')
 
-#Employee select counter page
-def selectCounter(request):
-    if request.user.is_authenticated and request.user.username != 'admin':
-        if request.method == 'POST':
-            old_counter = int(request.user.employee.counterNumber)
-            new_counter = int(request.POST['counter'])
+    # Get the current customer (first available verified user in queue)
+    current_customer = QueueUser.objects.filter(is_verified=True, is_available=True).order_by('position').first()
+    
+    # Get all users waiting in the queue (verified users), prioritizing available users
+    all_queue_users = QueueUser.objects.filter(is_verified=True).order_by('is_available', 'position')
+    
+    # Get all unverified users (registered but not verified) - order by ID for consistency
+    unverified_users = QueueUser.objects.filter(is_verified=False).order_by('id')
 
-            #if more than one employee opened up this page and one selected a counter, it wouldn't be removed from the page until the page is reloaded
-            #So if, by chance, the other employee selects the already selected counter, page would reload and the selected counter would be removed.
-            try:
-                availableCounters.remove(new_counter)
-            except:
-                return render(request, 'selectCounter.html', {'availableCounters': availableCounters})
+    if request.method == 'POST':
+        action = (
+            'serve' if 'serve' in request.POST else
+            'remove' if 'remove' in request.POST else
+            'next' if 'next' in request.POST else
+            'add_delay_5' if 'add_delay_5' in request.POST else
+            'add_delay_10' if 'add_delay_10' in request.POST else
+            'add_delay_15' if 'add_delay_15' in request.POST else
+            'reset_delay' if 'reset_delay' in request.POST else
+            'notify_next' if 'notify_next' in request.POST else
+            None
+        )
 
-            global counters
-            counters[new_counter] = 0
+        if action == 'notify_next' and current_customer:
+            # Find the next available user in the queue (position after current)
+            next_user = (
+                QueueUser.objects
+                .filter(is_verified=True, is_available=True, position__gt=current_customer.position)
+                .order_by('position')
+                .first()
+            )
+            if next_user:
+                def notify_next_sender():
+                    try:
+                        send_call_now_notification(next_user)
+                    except Exception as e:
+                        logger.error(f"Exception sending call-now notification to {next_user.email}: {e}", exc_info=True)
+                threading.Thread(target=notify_next_sender).start()
+                messages.success(request, f"Notification sent to next available user (Token #{next_user.token}).")
+            else:
+                messages.info(request, "No next available user in the queue to notify.")
+            return redirect('employee')
 
-            #if the employee is changing counter (wouldn't work if the employee just logged in because there is no old_counter i.e. old_counter = 0)
-            if old_counter in counters:
-                counters.pop(old_counter)
-                availableCounters.append(old_counter)
+        if action in ('serve', 'remove', 'next') and current_customer:
+            # Remove the first customer (served or removed)
+            current_customer.delete()
 
-                #removing the one with pos=0 (the customer details which were displayed on the employee's screen before different counter was selected, if there was one)
-                try:
-                    current = userData.objects.get(counter = old_counter, pos = 0)
-                    current.delete()
-                except:
-                    pass
-                
-                #reassigning new counter (smallest queue) to customers who were assigned the old_counter 
-                new = userData.objects.filter(counter = old_counter).order_by('pos')
-                for customer in new:
-                    temp = min(counters.values())                               #smallest queue
-                    res = [key for key in counters if counters[key] == temp]    #counter(s) of that queue
-                    customer.counter = res[0]
-                    customer.pos = temp + 1
-                    customer.save()
-                    counters[res[0]] += 1                                       #adding one customer to the counter
+            # Re-number remaining queue positions
+            remaining = QueueUser.objects.filter(is_verified=True).order_by('position')
+            for idx, user in enumerate(remaining, start=1):
+                if user.position != idx:
+                    user.position = idx
+                    user.save(update_fields=['position'])
 
-            #sorting so that it gets displayed in ascending order
-            availableCounters.sort()
+            # Notify the new first available user to come for service (if any)
+            new_current = QueueUser.objects.filter(is_verified=True, is_available=True).order_by('position').first()
+            if new_current:
+                def call_now_sender():
+                    try:
+                        send_call_now_notification(new_current)
+                    except Exception as e:
+                        logger.error(f"Exception sending call-now notification to {new_current.email}: {e}", exc_info=True)
+                threading.Thread(target=call_now_sender).start()
 
-            #assigning counter
-            user = request.user
-            user.employee.counterNumber = new_counter
-            user.employee.save()
+            messages.success(request, 'Moved to next customer.')
+            return redirect('employee')
+
+        if action in ('add_delay_5', 'add_delay_10', 'add_delay_15', 'reset_delay'):
+            config = QueueConfig.get()
+            if action == 'reset_delay':
+                config.delay_offset_minutes = 0
+                config.save(update_fields=['delay_offset_minutes'])
+                messages.success(request, 'Global delay reset to 0 minutes.')
+            else:
+                inc = 5 if action == 'add_delay_5' else 10 if action == 'add_delay_10' else 15
+                config.delay_offset_minutes = max(0, (config.delay_offset_minutes or 0) + inc)
+                config.save(update_fields=['delay_offset_minutes'])
+                messages.success(request, f'Added {inc} minutes to global waiting time.')
+            return redirect('employee')
+
+    context = {
+        'name': current_customer.name if current_customer else None,
+        'token': current_customer.token if current_customer else None,
+        'counter': 1,  # placeholder; wire to Employee model later
+        'all_queue_users': all_queue_users,  # All users in queue
+        'queue_count': all_queue_users.count(),  # Total count
+        'unverified_users': unverified_users,  # Unverified users
+        'unverified_count': unverified_users.count(),  # Unverified count
+    }
+
+    return render(request, 'app1/employee.html', context)
+
+
+def login(request):
+    """Employee login page. Handles POST authentication and redirects on success."""
+    if request.method == 'POST':
+        username = request.POST.get('username', '').strip()
+        password = request.POST.get('password', '').strip()
+
+        if not username or not password:
+            messages.error(request, "Username and password are required.")
+            return render(request, 'app1/login.html')
+
+        user = authenticate(request, username=username, password=password)
+        if user is not None:
+            auth_login(request, user)
+            messages.success(request, f"Welcome {user.username}!")
             return redirect('employee')
         else:
-            return render(request, 'selectCounter.html', {'availableCounters': availableCounters})
-    else:
-        return redirect('login')
+            messages.error(request, "Invalid username or password.")
+
+    return render(request, 'app1/login.html')
+
+
+def selectCounter(request):
+    return render(request, 'app1/selectCounter.html')
+
+
+def logout(request):
+    # Log out authenticated user and clear session
+    try:
+        auth_logout(request)
+    finally:
+        request.session.flush()
+    messages.success(request, "You have been logged out successfully.")
+    return redirect('index')
+
+
+# -------------------
+# Registration + OTP
+# -------------------
+def register(request):
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        email = request.POST.get('email', '').strip()
+
+        if not name or not email:
+            messages.error(request, "Please fill all the required fields.")
+            return redirect('register')
+
+        # Create user without adding to queue yet
+        try:
+            user = QueueUser.objects.create(
+                name=name,
+                email=email,
+                otp='000000',  # Will be generated when OTP is sent
+                position=None  # Don't assign position until verified
+            )
+        except IntegrityError:
+            messages.error(request, "This email is already registered.")
+            return redirect('register')
+
+        # Store user_id in session
+        request.session['user_id'] = user.id
+
+        # Send OTP email
+        def otp_sender():
+            try:
+                send_otp_email(user)
+            except Exception as e:
+                logger.error(f"Exception sending OTP email to {user.email}: {e}", exc_info=True)
+
+        otp_thread = threading.Thread(target=otp_sender)
+        otp_thread.start()
+
+        messages.success(request, f"Registration initiated! Please check your email for OTP verification. Your token number is #{user.token}")
+        return redirect('otp')
+
+    return render(request, 'app1/register.html')
+
+
+def otp(request):
+    user_id = request.session.get('user_id')
+    if not user_id:
+        messages.error(request, "Please register first.")
+        return redirect('register')
+    
+    try:
+        user = QueueUser.objects.get(id=user_id)
+    except QueueUser.DoesNotExist:
+        messages.error(request, "Invalid session. Please register again.")
+        return redirect('register')
+    
+    if user.is_verified:
+        messages.info(request, "You are already verified!")
+        return redirect('success')
+    
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        
+        if action == 'verify':
+            entered_otp = request.POST.get('otp', '').strip()
+            
+            if not entered_otp:
+                messages.error(request, "Please enter the OTP.")
+                return render(request, 'app1/otp.html', {'user': user})
+            
+            if user.verify_otp(entered_otp):
+                # Assign position in queue after successful verification
+                # First, get all verified users (excluding the current user being verified)
+                existing_verified_users = QueueUser.objects.filter(is_verified=True).exclude(id=user.id)
+                
+                if not existing_verified_users.exists():
+                    # This is the first verified user, assign position 1
+                    user.position = 1
+                else:
+                    # Get the highest position from existing verified users and add 1
+                    last_position = existing_verified_users.aggregate(models.Max('position'))['position__max']
+                    user.position = last_position + 1
+                
+                user.save(update_fields=['position'])
+                
+                # Send welcome notification
+                def notification_sender():
+                    try:
+                        send_welcome_notification(user)
+                    except Exception as e:
+                        logger.error(f"Exception in background welcome notification for {user.email}: {e}", exc_info=True)
+                
+                notification_thread = threading.Thread(target=notification_sender)
+                notification_thread.start()
+                
+                messages.success(request, "OTP verified successfully! You have been added to the queue.")
+                return redirect('success')
+            else:
+                messages.error(request, "Invalid or expired OTP. Please try again.")
+        
+        elif action == 'resend':
+            if user.is_otp_valid():
+                messages.info(request, "OTP is still valid. Please check your email or wait before requesting a new one.")
+            else:
+                def otp_sender():
+                    try:
+                        send_otp_email(user)
+                    except Exception as e:
+                        logger.error(f"Exception resending OTP email to {user.email}: {e}", exc_info=True)
+                
+                otp_thread = threading.Thread(target=otp_sender)
+                otp_thread.start()
+                
+                messages.success(request, "New OTP sent to your email.")
+    
+    return render(request, 'app1/otp.html', {'user': user})
+
+
+def success(request):
+    user_id = request.session.get('user_id')
+    if not user_id:
+        messages.error(request, "Please register first.")
+        return redirect('register')
+    
+    try:
+        user = QueueUser.objects.get(id=user_id)
+        if not user.is_verified:
+            messages.error(request, "Please verify your email first.")
+            return redirect('otp')
+    except QueueUser.DoesNotExist:
+        messages.error(request, "Invalid session. Please register again.")
+        return redirect('register')
+    
+    return render(request, 'app1/success.html', {
+        'user': user,
+        'name': user.name,
+        'position': user.position,
+        'token': user.token
+    })
+
+
+def reorder_positions():
+    """Reorders all verified users to have sequential positions starting from 1"""
+    verified_users = QueueUser.objects.filter(is_verified=True).order_by('position')
+    for index, user in enumerate(verified_users, 1):
+        if user.position != index:
+            user.position = index
+            user.save(update_fields=['position'])
+
+def toggle_availability(request):
+    """Toggle user's availability status."""
+    user_id = request.session.get('user_id')
+    if not user_id:
+        messages.error(request, "No active session. Please register/login first.")
+        return redirect('register')
+
+    try:
+        queue_user = QueueUser.objects.get(id=user_id)
+    except QueueUser.DoesNotExist:
+        messages.error(request, "Invalid session. Please register again.")
+        return redirect('register')
+
+    if not queue_user.is_verified:
+        messages.info(request, "Please verify your email first.")
+        return redirect('otp')
+
+    # Toggle availability
+    queue_user.is_available = not queue_user.is_available
+    queue_user.save(update_fields=['is_available'])
+    
+    status = "available" if queue_user.is_available else "unavailable"
+    messages.success(request, f"You are now {status}.")
+    return redirect('queue_details')
+
+
+def cancel_spot(request):
+    """Allow the current session user to cancel their spot and leave the queue."""
+    user_id = request.session.get('user_id')
+    if not user_id:
+        messages.error(request, "No active session. Please register/login first.")
+        return redirect('register')
+
+    try:
+        queue_user = QueueUser.objects.get(id=user_id)
+    except QueueUser.DoesNotExist:
+        messages.error(request, "Invalid session. Please register again.")
+        return redirect('register')
+
+    # Only verified users with a position can cancel from queue
+    if not queue_user.is_verified or queue_user.position is None:
+        messages.info(request, "You are not currently in the queue.")
+        return redirect('queue_details')
+
+    # Delete user and reorder the remaining queue
+    queue_user.delete()
+    remaining = QueueUser.objects.filter(is_verified=True).order_by('position')
+    for idx, user in enumerate(remaining, start=1):
+        if user.position != idx:
+            user.position = idx
+            user.save(update_fields=['position'])
+
+    # Clear session user_id since their spot is cancelled
+    try:
+        del request.session['user_id']
+    except KeyError:
+        pass
+
+    messages.success(request, "Your spot has been cancelled. Thank you!")
+    return redirect('index')
+
+def dashboard(request):
+    # Get queue statistics for dashboard (only verified users)
+    total_users = QueueUser.objects.filter(is_verified=True).count()
+    current_serving = 1 if total_users > 0 else 0
+    waiting_count = max(0, total_users - 1)
+    
+    context = {
+        'total_in_queue': total_users,  # Changed from total_users to match template
+        'current_serving': current_serving,
+        'waiting_count': waiting_count,
+        'completed_count': 0,  # Add missing variable
+        'cancelled_count': 0,  # Add missing variable
+        'recent_entries': [],  # Add missing variable for recent activity table
+    }
+    
+    return render(request, 'app1/dashboard.html', context)
+
+def user_login(request):
+    """User login page for existing users to access their queue position."""
+    if request.method == 'POST':
+        email = request.POST.get('email', '').strip()
+        name = request.POST.get('name', '').strip()
+
+        if not email or not name:
+            messages.error(request, "Email and name are required.")
+            return render(request, 'app1/register.html')
+
+        try:
+            user = QueueUser.objects.get(email=email, name=name)
+            
+            # Check if user is verified and in queue
+            if user.is_verified and user.position is not None:
+                # Store user_id in session
+                request.session['user_id'] = user.id
+                messages.success(request, f"Welcome back {user.name}! You are in the queue at position {user.position}.")
+                return redirect('queue_details')
+            else:
+                messages.error(request, "You are not currently in the queue. Please register first.")
+                return render(request, 'app1/register.html')
+                
+        except QueueUser.DoesNotExist:
+            messages.error(request, "No user found with these credentials. Please check your email and name, or register as a new user.")
+            return render(request, 'app1/register.html')
+
+    return render(request, 'app1/register.html')
+
+
+def submit_request(request):
+    """Allow a registered user to submit a textual request to admin."""
+    user_id = request.session.get('user_id')
+    if not user_id:
+        messages.error(request, "Please register first.")
+        return redirect('register')
+
+    try:
+        queue_user = QueueUser.objects.get(id=user_id)
+    except QueueUser.DoesNotExist:
+        messages.error(request, "Invalid session. Please register again.")
+        return redirect('register')
+
+    if request.method == 'POST':
+        message = request.POST.get('message', '').strip()
+        request_type = request.POST.get('request_type', 'general')
+        if not message:
+            messages.error(request, "Please enter a message for your request.")
+        else:
+            user_request = UserRequest.objects.create(
+                queue_user=queue_user,
+                message=message,
+                request_type=request_type
+            )
+            # Email the admin(s)
+            admin_email = os.getenv('ADMIN_EMAIL') or getattr(settings, 'DEFAULT_FROM_EMAIL', None) or getattr(settings, 'EMAIL_HOST_USER', None)
+            if admin_email:
+                subject = f"User Request: {queue_user.name} ({queue_user.email})"
+                body = (
+                    f"User: {queue_user.name} (Token #{queue_user.token})\n"
+                    f"Email: {queue_user.email}\n"
+                    f"Type: {dict(UserRequest.REQUEST_TYPES).get(request_type, request_type)}\n"
+                    f"Message:\n{message}\n"
+                    f"Request ID: {user_request.id}"
+                )
+                send_robust_email(subject, body, [admin_email])
+            messages.success(request, "Your request has been submitted to the admin.")
+            return redirect('queue_details')
+
+    return render(request, 'app1/submit_request.html', {
+        'request_types': UserRequest.REQUEST_TYPES,
+        'queue_user': queue_user,
+    })
+
+
+def staff_availability(request):
+    """Public page showing availability of staff (e.g., doctors, managers)."""
+    role = request.GET.get('role', '').strip()
+    employees = Employee.objects.all().select_related('user').order_by('user__username')
+    if role:
+        employees = employees.filter(role__iexact=role)
+
+    roles = (
+        Employee.objects
+        .values_list('role', flat=True)
+        .distinct()
+        .order_by('role')
+    )
+
+    return render(request, 'app1/staff_availability.html', {
+        'employees': employees,
+        'roles': roles,
+        'active_role': role,
+    })

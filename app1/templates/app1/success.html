@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registration Successful - Queue Management System</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/main.css' %}">
+</head>
+<body>
+    <div class="page-container">
+        <div class="card">
+            <div class="header">
+                <div class="logo">✅</div>
+                <h1 class="title">Registration Successful!</h1>
+                <p class="subtitle">Welcome to the queue</p>
+            </div>
+
+            <div class="table-container">
+                <h3 class="mb-3">Your Queue Information</h3>
+                <div class="queue-item">
+                    <div class="queue-info">
+                        <div class="queue-number">Name: {{ name }}</div>
+                        <div class="queue-status">Email: {{ email }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">🎫</div>
+                    <div class="stat-number">{{ token }}</div>
+                    <div class="stat-label">Token Number</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">📍</div>
+                    <div class="stat-number">{{ position }}</div>
+                    <div class="stat-label">Position</div>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <h4 class="mb-2">What's Next?</h4>
+                <div class="feature">
+                    <span class="feature-icon">⏱️</span>
+                    <span>Wait for your turn to be called</span>
+                </div>
+                <div class="feature">
+                    <span class="feature-icon">🔔</span>
+                    <span>You'll receive notifications when it's your turn</span>
+                </div>
+                <div class="feature">
+                    <span class="feature-icon">📱</span>
+                    <span>Keep this page open or check back later</span>
+                </div>
+            </div>
+
+            <div class="btn-container">
+                <a href="{% url 'queue_details' %}" class="btn btn-primary btn-full">View Queue Status</a>
+                <a href="{% url 'index' %}" class="btn btn-secondary btn-full">Back to Home</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

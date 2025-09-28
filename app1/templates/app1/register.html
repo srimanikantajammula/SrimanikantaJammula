@@ -1,0 +1,112 @@
+{% extends 'app1/base.html' %}
+{% block title %}Join Queue - Queue Management System{% endblock %}
+
+{% block extra_css %}
+<style>
+    .divider {
+        text-align: center;
+        margin: 30px 0;
+        position: relative;
+    }
+    
+    .divider::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: #e0e0e0;
+    }
+    
+    .divider span {
+        background: white;
+        padding: 0 20px;
+        color: #666;
+        font-size: 14px;
+    }
+    
+    .login-section {
+        margin-top: 20px;
+    }
+    
+    .login-section h3 {
+        text-align: center;
+        color: #333;
+        margin-bottom: 20px;
+        font-size: 18px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-container">
+        <div class="card">
+            <div class="header">
+                <div class="logo">📝</div>
+                <h1 class="title">Join Queue</h1>
+                <p class="subtitle">Enter your details to join the queue</p>
+            </div>
+
+            {% if messages %}
+                <div class="messages">
+                    {% for message in messages %}
+                        <div class="alert alert-error">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <form method="POST" action="{% url 'register' %}">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label class="form-label" for="name">Full Name</label>
+                    <input type="text" id="name" name="name" class="form-input" placeholder="Enter your full name" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="email">Email Address</label>
+                    <input type="email" id="email" name="email" class="form-input" placeholder="Enter your email address" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="service">Service Required</label>
+                    <select id="service" name="service" class="form-input" required>
+                        <option value="">Select a service</option>
+                        <option value="general">General Inquiry</option>
+                        <option value="technical">Technical Support</option>
+                        <option value="billing">Billing</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-full">Join Queue</button>
+            </form>
+
+            <div class="divider">
+                <span>OR</span>
+            </div>
+
+            <div class="login-section">
+                <h3>Already in the queue? Login here</h3>
+                <form method="POST" action="{% url 'user_login' %}">
+                    {% csrf_token %}
+                    <div class="form-group">
+                        <label class="form-label" for="login_email">Email Address</label>
+                        <input type="email" id="login_email" name="email" class="form-input" placeholder="Enter your email address" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="login_name">Full Name</label>
+                        <input type="text" id="login_name" name="name" class="form-input" placeholder="Enter your full name" required>
+                    </div>
+
+                    <button type="submit" class="btn btn-secondary btn-full">Login to Queue</button>
+                </form>
+            </div>
+
+            <div class="text-center mt-3">
+                <a href="{% url 'index' %}" class="btn btn-secondary btn-full">← Back to Home</a>
+            </div>
+        </div>
+    </div>
+{% endblock %}

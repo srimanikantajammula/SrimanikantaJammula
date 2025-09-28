@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Queue Status - Queue Management System</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/main.css' %}">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="logo">📋</div>
+            <h1 class="title">Queue Status</h1>
+            <p class="subtitle">Current queue information and status</p>
+        </div>
+        
+        <!-- Queue Statistics -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">👥</div>
+                <div class="stat-number">{{ total_in_queue }}</div>
+                <div class="stat-label">Total in Queue</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">⏳</div>
+                <div class="stat-number">{{ waiting_count }}</div>
+                <div class="stat-label">Waiting</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">✅</div>
+                <div class="stat-number">{{ completed_count }}</div>
+                <div class="stat-label">Completed</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">🚫</div>
+                <div class="stat-number">{{ cancelled_count }}</div>
+                <div class="stat-label">Cancelled</div>
+            </div>
+        </div>
+        
+        <!-- Queue List -->
+        <div class="table-container">
+            <h3 class="mb-3">Current Queue</h3>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Position</th>
+                        <th>Queue #</th>
+                        <th>Name</th>
+                        <th>Service</th>
+                        <th>Status</th>
+                        <th>Time</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in queue_entries %}
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td>{{ entry.queue_number }}</td>
+                        <td>{{ entry.name }}</td>
+                        <td>{{ entry.service }}</td>
+                        <td>
+                            <span class="badge badge-{{ entry.status|lower }}">
+                                {{ entry.status }}
+                            </span>
+                        </td>
+                        <td>{{ entry.created_at|date:"H:i" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center">No entries in queue</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Actions -->
+        <div class="btn-row">
+            <a href="{% url 'register' %}" class="btn btn-primary">Join Queue</a>
+            <a href="{% url 'dashboard' %}" class="btn btn-secondary">Dashboard</a>
+            <a href="{% url 'index' %}" class="btn btn-secondary">Home</a>
+        </div>
+    </div>
+</body>
+</html>

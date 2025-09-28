@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Select Counter - Queue Management System</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/main.css' %}">
+</head>
+<body>
+    <div class="page-container">
+        <div class="card">
+            <div class="header">
+                <div class="logo">🔢</div>
+                <h1 class="title">Select Counter</h1>
+                <p class="subtitle">Choose your service counter</p>
+            </div>
+
+            <form method="POST" action="{% url 'selectCounter' %}">
+                {% csrf_token %}
+                {% if availableCounters|length > 0 %}
+                    <div class="form-group">
+                        <label class="form-label" for="counter">Available Counters</label>
+                        <select id="counter" name="counter" class="form-input" required>
+                            <option value="">Select a counter</option>
+                            {% for counter in availableCounters %}
+                                <option value="{{ counter }}">Counter {{ counter }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-full">Submit</button>
+                {% else %}
+                    <div class="text-center">
+                        <div class="logo">🚫</div>
+                        <h3 class="mb-2">No Available Counters</h3>
+                        <p class="subtitle">All counters are currently occupied</p>
+                    </div>
+                {% endif %}
+            </form>
+
+            <div class="text-center mt-3">
+                <a href="{% url 'employee' %}" class="btn btn-secondary btn-full">Back to Employee Panel</a>
+                <a href="{% url 'index' %}" class="btn btn-secondary btn-full">Home</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

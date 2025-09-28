@@ -1,0 +1,292 @@
+{% extends 'app1/base.html' %}
+{% block title %}Queue Status - Queue Management System{% endblock %}
+
+{% block extra_head %}
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<style>
+    /* Mobile-specific optimizations */
+    @media (max-width: 768px) {
+        .table th:nth-child(2),
+        .table td:nth-child(2) {
+            display: none; /* Hide token column on mobile */
+        }
+        
+        .wait-time {
+            font-size: 1.2rem !important;
+            font-weight: bold !important;
+            color: #2563eb !important;
+        }
+        
+        .btn {
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .table th:nth-child(3),
+        .table td:nth-child(3) {
+            display: none; /* Hide name column on very small screens */
+        }
+        
+        .stats-grid {
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        
+        .stat-card {
+            padding: 15px 10px;
+        }
+        
+        .stat-number {
+            font-size: 1.8rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="logo">📊</div>
+            <h1 class="title">Queue Status</h1>
+            <p class="subtitle">Real-time queue information</p>
+        </div>
+        
+        <!-- Queue Statistics -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">👥</div>
+                <div class="stat-number">{{ total_users }}</div>
+                <div class="stat-label">Total in Queue</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">🎯</div>
+                <div class="stat-number">{{ current_position }}</div>
+                <div class="stat-label">Now Serving</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">⏳</div>
+                <div class="stat-number">{{ waiting_count }}</div>
+                <div class="stat-label">Waiting</div>
+            </div>
+        </div>
+        
+        <!-- Availability Status -->
+        {% if users_ahead %}
+        <div class="table-container">
+            <h3 class="mb-3">Users Ahead of You</h3>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Position</th>
+                        <th>Name</th>
+                        <th>Token</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user_ahead in users_ahead %}
+                    <tr>
+                        <td>#{{ user_ahead.position }}</td>
+                        <td>{{ user_ahead.name }}</td>
+                        <td>{{ user_ahead.token }}</td>
+                        <td>
+                            {% if user_ahead.is_available %}
+                                <span style="color: #2563eb;">🟢 Available</span>
+                            {% else %}
+                                <span style="color: #6b7280;">🔴 Unavailable</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        <!-- Queue List -->
+        <div class="table-container">
+            <h3 class="mb-3">Current Queue</h3>
+            <p><a class="btn btn-outline-primary" href="{% url 'submit_request' %}">Send a request to admin</a></p>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Position</th>
+                        <th>Token</th>
+                        <th>Name</th>
+                        <th>Estimated Wait</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if queue_users_with_waiting_time %}
+                        {% for row in queue_users_with_waiting_time %}
+                        <tr {% if not row.user.is_available %}style="opacity: 0.6; background-color: #f8f9fa;"{% endif %}>
+                            <td>#{{ row.user.position }}</td>
+                            <td>{{ row.user.token }}</td>
+                            <td>
+                                {{ row.user.name }}
+                                {% if not row.user.is_available %}
+                                    <span style="color: #dc3545; font-size: 0.8em;">(Unavailable)</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if row.user.is_available %}
+                                    <span class="wait-time" data-remaining-minutes="{{ row.estimated_wait_minutes }}" style="font-weight: bold; color: #2563eb;">
+                                        {{ row.wait_time_display }}
+                                    </span>
+                                    {% if row.estimated_wait_minutes > 0 %}
+                                        <small style="color: #6c757d; display: block;">⏱️ Live countdown</small>
+                                    {% endif %}
+                                {% else %}
+                                    <span style="color: #6c757d;">Skipped</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="4" class="text-center">No entries in queue</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Actions -->
+        <div class="btn-row">
+            <a href="{% url 'register' %}" class="btn btn-primary">Join Queue</a>
+            <a href="{% url 'dashboard' %}" class="btn btn-secondary">Dashboard</a>
+            <a href="{% url 'index' %}" class="btn btn-secondary">Home</a>
+            <button onclick="refreshQueue()" class="btn btn-secondary" style="background-color: #17a2b8;">🔄 Refresh Queue</button>
+            {% if current_user.is_verified %}
+                <a href="{% url 'toggle_availability' %}" class="btn btn-secondary">
+                    {% if current_user.is_available %}Mark Unavailable{% else %}Mark Available{% endif %}
+                </a>
+                <a href="{% url 'cancel_spot' %}" class="btn btn-danger" onclick="return confirm('Are you sure you want to cancel your spot?');">Cancel my spot</a>
+            {% endif %}
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Mobile-optimized countdown implementation
+    document.addEventListener('DOMContentLoaded', function() {
+        var countdownElements = document.querySelectorAll('.wait-time');
+        var countdownIntervals = [];
+        
+        // Check if device is mobile
+        var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
+        
+        countdownElements.forEach(function(element, index) {
+            var minutes = parseInt(element.getAttribute('data-remaining-minutes'), 10);
+            
+            if (isNaN(minutes) || minutes <= 0) {
+                element.textContent = 'Now serving';
+                return;
+            }
+            
+            // Store the start time to calculate elapsed time
+            var startTime = new Date().getTime();
+            var totalMinutes = minutes;
+            
+            // Start countdown for this element
+            var countdown = setInterval(function() {
+                var currentTime = new Date().getTime();
+                var elapsedSeconds = Math.floor((currentTime - startTime) / 1000);
+                var remainingSeconds = Math.max(0, (totalMinutes * 60) - elapsedSeconds);
+                
+                if (remainingSeconds <= 0) {
+                    element.textContent = 'Now serving';
+                    clearInterval(countdown);
+                    return;
+                }
+                
+                var hours = Math.floor(remainingSeconds / 3600);
+                var mins = Math.floor((remainingSeconds % 3600) / 60);
+                var secs = remainingSeconds % 60;
+                
+                // Mobile-friendly display format
+                if (isMobile) {
+                    if (hours > 0) {
+                        element.textContent = hours + 'h ' + mins + 'm';
+                    } else if (mins > 0) {
+                        element.textContent = mins + 'm ' + secs + 's';
+                    } else {
+                        element.textContent = secs + 's';
+                    }
+                } else {
+                    // Desktop format
+                    if (hours > 0) {
+                        element.textContent = hours + 'h ' + mins + 'm';
+                    } else if (mins > 0) {
+                        element.textContent = mins + 'm ' + secs + 's';
+                    } else {
+                        element.textContent = secs + 's';
+                    }
+                }
+            }, 1000);
+            
+            countdownIntervals.push(countdown);
+        });
+        
+        // Store intervals globally so they can be cleared if needed
+        window.countdownIntervals = countdownIntervals;
+        
+        // Mobile-specific optimizations
+        if (isMobile) {
+            // Prevent zoom on double tap
+            var lastTouchEnd = 0;
+            document.addEventListener('touchend', function (event) {
+                var now = (new Date()).getTime();
+                if (now - lastTouchEnd <= 300) {
+                    event.preventDefault();
+                }
+                lastTouchEnd = now;
+            }, false);
+            
+            // Optimize for mobile performance
+            document.body.style.webkitTouchCallout = 'none';
+            document.body.style.webkitUserSelect = 'none';
+            document.body.style.khtmlUserSelect = 'none';
+            document.body.style.mozUserSelect = 'none';
+            document.body.style.msUserSelect = 'none';
+            document.body.style.userSelect = 'none';
+        }
+    });
+    
+    // Manual refresh function with mobile optimization
+    function refreshQueue() {
+        if (window.countdownIntervals) {
+            window.countdownIntervals.forEach(function(interval) {
+                clearInterval(interval);
+            });
+        }
+        
+        // Show loading indicator on mobile
+        var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
+        if (isMobile) {
+            var refreshBtn = document.querySelector('button[onclick="refreshQueue()"]');
+            if (refreshBtn) {
+                refreshBtn.textContent = '🔄 Loading...';
+                refreshBtn.disabled = true;
+            }
+        }
+        
+        window.location.reload();
+    }
+    
+    // Handle orientation change on mobile
+    window.addEventListener('orientationchange', function() {
+        setTimeout(function() {
+            // Recalculate layout after orientation change
+            window.dispatchEvent(new Event('resize'));
+        }, 100);
+    });
+</script>
+{% endblock %}

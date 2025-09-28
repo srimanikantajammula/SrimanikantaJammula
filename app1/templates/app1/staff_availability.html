@@ -1,0 +1,62 @@
+{% extends 'app1/base.html' %}
+{% block title %}Staff Availability{% endblock %}
+
+{% block content %}
+<div class="container" style="margin: 24px auto; max-width: 1000px;">
+    <div class="header">
+        <div class="logo">🩺</div>
+        <h1 class="title">Staff Availability</h1>
+        <p class="subtitle">Check who is currently available (doctors, managers, etc.).</p>
+    </div>
+
+    <div class="table-container">
+        <form method="get" class="mb-3">
+            <label for="role" class="form-label">Filter by role</label>
+            <select id="role" name="role" class="form-input" onchange="this.form.submit()">
+                <option value="">All roles</option>
+                {% for r in roles %}
+                    <option value="{{ r }}" {% if active_role == r %}selected{% endif %}>{{ r }}</option>
+                {% endfor %}
+            </select>
+        </form>
+
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Role</th>
+                    <th>Counter</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if employees %}
+                    {% for emp in employees %}
+                    <tr>
+                        <td>{{ emp.user.username }}</td>
+                        <td>{{ emp.role }}</td>
+                        <td>{{ emp.counter_number }}</td>
+                        <td>
+                            {% if emp.is_available %}
+                                <span style="color:#2563eb;">🟢 Available</span>
+                            {% else %}
+                                <span style="color:#6b7280;">🔴 Unavailable</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="4" class="text-center">No staff found.</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+    <div class="btn-row">
+        <a href="{% url 'index' %}" class="btn btn-secondary">Home</a>
+        <a href="{% url 'queue_details' %}" class="btn btn-secondary">View Queue</a>
+    </div>
+</div>
+{% endblock %}
+
