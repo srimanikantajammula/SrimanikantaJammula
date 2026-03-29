@@ -12,33 +12,33 @@ A modern, mobile-friendly Django web application designed to optimize queue mana
 - [Contributing](#-contributing)
 - [License](#-license)
 
-## ðŸš€ Features
+##  Features
 
 ### Customer Features
-- **ðŸ“± Mobile-Optimized Interface** - Fully responsive design that works perfectly on smartphones and tablets
-- **ðŸ” Email Verification** - Secure OTP-based registration via email
-- **ðŸŽ« Token System** - Unique token numbers for easy identification
-- **â±ï¸ Live Countdown** - Real-time countdown showing estimated wait time
-- **ðŸ“§ Email Notifications** - Automatic notifications for position updates and turn alerts
-- **ðŸ‘¤ Availability Toggle** - Mark yourself as available/unavailable in the queue
-- **ðŸ“Š Queue Status** - View current position and estimated wait time
-- **ðŸ”„ Auto-Refresh** - Automatic page updates to show latest queue information
+-  Mobile-Optimized Interface - Fully responsive design that works perfectly on smartphones and tablets
+-  Email Verification** - Secure OTP-based registration via email
+-  Token System - Unique token numbers for easy identification
+-  Live Countdown** - Real-time countdown showing estimated wait time
+-  Email Notifications - Automatic notifications for position updates and turn alerts
+-  Availability Toggle - Mark yourself as available/unavailable in the queue
+-  Queue Status - View current position and estimated wait time
+-  Auto-Refresh - Automatic page updates to show latest queue information
 
 ### Employee Features
-- **ðŸ‘¨â€ðŸ’¼ Employee Dashboard** - Clean, intuitive interface for staff
-- **ðŸŽ¯ Customer Management** - Serve, skip, or remove customers from queue
-- **â° Delay Management** - Add delays to queue (5, 10, 15 minutes) or reset
-- **ðŸ“¢ Notifications** - Send notifications to next customers
-- **ðŸ“‹ Queue Overview** - View all customers with availability status
-- **ðŸ”„ Real-time Updates** - Live updates of queue changes
+-  Employee Dashboard - Clean, intuitive interface for staff
+-  Customer Management - Serve, skip, or remove customers from queue
+-  Delay Management - Add delays to queue (5, 10, 15 minutes) or reset
+-  Notifications - Send notifications to next customers
+-  Queue Overview - View all customers with availability status
+-  Real-time Updates - Live updates of queue changes
 
 ### Admin Features
-- **ðŸ‘‘ Django Admin Panel** - Full administrative control
-- **ðŸ‘¥ User Management** - Manage customers and employees
-- **ðŸ“Š Analytics** - View queue statistics and user data
-- **âš™ï¸ System Configuration** - Configure queue settings
+-  Django Admin Panel - Full administrative control
+-  User Management - Manage customers and employees
+-  Analytics - View queue statistics and user data
+-  System Configuration - Configure queue settings
 
-## ðŸ› ï¸ Technology Stack
+##  Technology Stack
 
 ### Backend
 - **Django 5.2.5** - Web framework
@@ -60,7 +60,7 @@ A modern, mobile-friendly Django web application designed to optimize queue mana
 - **Django Built-ins** - Authentication, admin, email, etc.
             
 
-## ðŸ“± Mobile Features
+##  Mobile Features
 
 - **Responsive Design** - Works on all screen sizes
 - **Touch-Friendly** - Optimized for touch interactions
@@ -68,7 +68,7 @@ A modern, mobile-friendly Django web application designed to optimize queue mana
 - **Offline-Ready** - Basic functionality works without internet
 - **Fast Loading** - Optimized for mobile networks
 
-## ðŸš€ Quick Start
+##  Quick Start
 
 ### Prerequisites
 - Python 3.8+
@@ -112,7 +112,7 @@ A modern, mobile-friendly Django web application designed to optimize queue mana
    - **Desktop**: http://127.0.0.1:8000
    - **Mobile**: http://YOUR_IP_ADDRESS:8000
 
-## ðŸ“§ Email Configuration
+##  Email Configuration
 
 Configure your email settings in the `.env` file:
 
@@ -127,7 +127,7 @@ DEFAULT_FROM_EMAIL=your_email@gmail.com
 
 **Note**: For Gmail, you'll need to use an App Password instead of your regular password.
 
-## ðŸŽ¯ Usage
+## Usage
 
 ### For Customers
 1. **Register** - Enter name and email address
@@ -148,7 +148,7 @@ DEFAULT_FROM_EMAIL=your_email@gmail.com
 3. **Configure System** - Set up queue parameters
 4. **Monitor Activity** - View system statistics
 
-## ðŸ”§ Configuration
+##  Configuration
 
 ### Mobile Access
 To access from mobile devices on the same network:
@@ -185,14 +185,14 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Availability**: Users can mark themselves unavailable
 - **Auto-Refresh**: Pages refresh every 30-60 seconds
 
-## ðŸ“Š Database Models
+##  Database Models
 
 - **QueueUser** - Customer information and queue position
 - **Employee** - Staff members and counter assignments
 - **QueueConfig** - Global queue settings
 - **UserRequest** - Customer requests and messages
 
-## ðŸŽ¨ UI/UX Features
+## UI/UX Features
 
 - **Modern Design** - Clean, professional interface
 - **Color-Coded Status** - Green (available), Red (unavailable)
@@ -201,7 +201,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Responsive Tables** - Horizontal scroll on small screens
 - **Loading States** - Visual feedback for actions
 
-## ðŸ”’ Security Features
+##  Security Features
 
 - **CSRF Protection** - Cross-site request forgery prevention
 - **Email Verification** - OTP-based registration
@@ -209,7 +209,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Input Validation** - Form validation and sanitization
 - **Admin Authentication** - Secure admin access
 
-## ðŸ“± Mobile Optimization
+##  Mobile Optimization
 
 - **Viewport Meta Tags** - Proper mobile rendering
 - **Touch Targets** - 44px minimum button size
@@ -217,7 +217,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Orientation Handling** - Smooth rotation support
 - **Performance** - Optimized for mobile networks
 
-## ðŸš€ Deployment
+##  Deployment
 
 ### Development
 ```bash
@@ -231,7 +231,7 @@ python manage.py runserver 0.0.0.0:8000
 - Configure proper static file serving
 - Set up SSL certificates
 
-## ðŸ“ API Endpoints
+##  API Endpoints
 
 - `/` - Home page
 - `/register/` - Customer registration
@@ -242,7 +242,7 @@ python manage.py runserver 0.0.0.0:8000
 - `/toggle-availability/` - Mark availability
 - `/cancel-spot/` - Leave queue
 
-## ðŸ¤ Contributing
+##  Contributing
 
 1. Fork the repository
 2. Create a feature branch
@@ -250,11 +250,11 @@ python manage.py runserver 0.0.0.0:8000
 4. Test thoroughly
 5. Submit a pull request
 
-## ðŸ“„ License
+##  License
 
 This project is open source and available under the MIT License.
 
-## ðŸ†˜ Support
+##  Support
 
 For support and questions:
 - Check the Django documentation
@@ -262,7 +262,7 @@ For support and questions:
 - Test with the provided sample data
 - Ensure email configuration is correct
 
-## ðŸ”„ Recent Updates
+## Recent Updates
 
 - âœ… **Mobile Optimization** - Full responsive design
 - âœ… **Live Countdown** - Real-time wait time updates
@@ -275,4 +275,4 @@ For support and questions:
 
 ---
 
-**Built with â¤ï¸ using Django and modern web technologies**
+
