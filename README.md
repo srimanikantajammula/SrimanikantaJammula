@@ -1,4 +1,4 @@
-# Queue Management System (QMS)
+﻿# Queue Management System (QMS)
 
 A modern, mobile-friendly Django web application designed to optimize queue management in retail stores, restaurants, banks, and other institutions where customers wait in line. The system allows customers to join a virtual queue, track their position in real-time, and receive notifications when it's their turn.
 
