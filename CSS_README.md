@@ -46,7 +46,7 @@ This project now uses a unified, professional CSS design system across all HTML 
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Page Title</title>
-    <link rel="stylesheet" href="{% static 'css/main.css' %}">
+    <link rel="stylesheet" href="cssmain.css">
 </head>
 <body>
     <div class="page-container">
