@@ -9,7 +9,7 @@ Built for retail stores, restaurants, banks, and any institution where customers
 [![Python](https://img.shields.io/badge/Python-3.13-3776AB?style=flat&logo=python&logoColor=white)](https://www.python.org/)
 [![Django](https://img.shields.io/badge/Django-5.2.5-092E20?style=flat&logo=django&logoColor=white)](https://www.djangoproject.com/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Stars](https://img.shields.io/github/stars/JAVVAJIDIVYA/Queue-Management-System?style=flat)](https://github.com/JAVVAJIDIVYA/Queue-Management-System/stargazers)
+[![Stars](https://img.shields.io/github/stars/srimanikantajammula/Queue-Management-System?style=flat)](https://github.com/srimanikantajammula/Queue-Management-System/stargazers)
 
 </div>
 
@@ -119,7 +119,7 @@ Built for retail stores, restaurants, banks, and any institution where customers
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/JAVVAJIDIVYA/Queue-Management-System.git
+git clone https://github.com/srimanikantajammula/Queue-Management-System.git
 cd Queue-Management-System
 
 # 2. Install dependencies
